@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ponish Translator</title>
+    <link rel="stylesheet" href="/assets/bootstrap.min.css">
+    <script src="/assets/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 50px;">
+        <h1>Ponish Translator</h1>
+        <div class="row">
+            <div class="col" style="margin-bottom: 20px; text-align: center;">
+                <select onchange="updateTarget();" id="source" class="form-select" style="font-weight: bold; text-align: center;">
+                    <option value="english" selected>English</option>
+                    <option value="ponish">Ponish</option>
+                </select>
+            </div>
+            <div class="col" style="margin-bottom: 20px; text-align: center;">
+                <select id="target" disabled class="form-select" style="font-weight: bold; text-align: center;">
+                    <option value="english">English</option>
+                    <option value="ponish" selected>Ponish</option>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm" style="margin-bottom: 20px;">
+                <textarea disabled autofocus spellcheck="false" autocomplete="off" id="input" onkeydown="updateTranslation();" onkeyup="updateTranslation();" class="form-control" style="resize: none; height: 200px;"></textarea>
+            </div>
+            <div class="col-sm">
+                <textarea id="output" class="form-control" style="resize: none; height: 200px;" disabled placeholder="Translation"></textarea>
+            </div>
+        </div>
+
+        <div class="alert alert-danger" id="error-swear" style="display: none;">Ponies don't swear.</div>
+    </div>
+
+    <script>
+        (async () => {
+            document.getElementById("source").value = "english";
+
+            window.updateTarget = () => {
+                if (document.getElementById("source").value === "english") {
+                    document.getElementById("target").value = "ponish";
+                } else {
+                    document.getElementById("target").value = "english";
+                }
+
+                let o = document.getElementById("output").value;
+                document.getElementById("output").value = document.getElementById("input").value;
+                document.getElementById("input").value = o;
+
+                updateTranslation();
+            }
+
+            window.list = (await (await fetch("/list")).text()).trim().split("\n").map(i => i.toLowerCase());
+            window.translate = (await (await fetch("/translate")).text()).trim().split("\n").map(i => i.toLowerCase().split("|"));
+            document.getElementById("output").value = "";
+
+            window.matchCase = (text, pattern) => {
+                let result = '';
+
+                for (let i = 0; i < text.length; i++) {
+                    let c = text.charAt(i);
+                    let p = pattern.charCodeAt(i);
+
+                    if(p >= 65 && p < 65 + 26) {
+                        result += c.toUpperCase();
+                    } else {
+                        result += c.toLowerCase();
+                    }
+                }
+
+                return result;
+            }
+
+            window.updateTranslation = () => {
+                let text = document.getElementById("input").value;
+                let currentTranslate = [...translate.map(i => [...i])];
+
+                if (document.getElementById("source").value === "ponish") {
+                    currentTranslate = currentTranslate.map(i => i.reverse());
+                }
+
+                for (let parts of currentTranslate) {
+                    parts = parts.map(i => i.toLowerCase());
+                    let regex = new RegExp("\\b" + parts[0] + "\\b", "img");
+                    console.log(parts, regex, text);
+
+                    for (let match of text.match(regex) ?? []) {
+                        text = text.replace(match, matchCase(parts[1], match));
+                    }
+
+                    console.log(text);
+                }
+
+                document.getElementById("error-swear").style.display = "none";
+                let check = " " + text.toLowerCase().replace(/[^a-z]/mg, " ").replace(/ +/mg, " ") + " ";
+                let swear = false;
+
+                for (let word of list) {
+                    word = " " + word.toLowerCase().replace(/[^a-z]/mg, " ").replace(/ +/mg, "") + " ";
+
+                    if (check.includes(word)) {
+                        swear = true;
+                        document.getElementById("output").value = "";
+                        document.getElementById("error-swear").style.display = "";
+                        return;
+                    }
+                }
+
+                document.getElementById("output").value = text.trim();
+            }
+
+            document.getElementById("input").disabled = false;
+            document.getElementById("input").focus();
+
+            updateTranslation();
+            updateTarget();
+        })();
+    </script>
+</body>
+</html>
